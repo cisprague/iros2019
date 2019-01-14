@@ -323,9 +323,7 @@ class Spacecraft(Indirect):
         self.kef[5] = Mf
 
         # final position and velocity
-        rf, vf = pk.par2ic(self.kef, pk.MU_SUN)
-        rf = np.array(rf)
-        vf = np.array(vf)
+        rf, vf = np.array(pk.par2ic(self.kef, pk.MU_SUN))
 
         # propagate trajectory
         tl, sl = self.propagate(T, self.s0, l0, self.alpha, atol=1e-10, rtol=1e-10)
@@ -338,14 +336,13 @@ class Spacecraft(Indirect):
         lmf = sl[-1, 13]
 
         # final eccentric anomoly transversality
-        lambdasf = sl[-1, 7:13]
-        rfnorm = np.sqrt(rf[0] * rf[0] + rf[1] * rf[1] + rf[2] * rf[2])
-        tmp = - pk.MU_SUN / rfnorm**3
-        tangent = np.array([vf[0], vf[1], vf[2], tmp *
-                            rf[0], tmp * rf[1], tmp * rf[2]])
+        lambdasf     = sl[-1, 7:13]
+        rfnorm       = np.linalg.norm(rf)
+        tmp          = -self.mu/rfnorm**3
+        tangent      = np.hstack((vf, tmp*rf))
         tangent_norm = np.linalg.norm(tangent)
-        tangent = tangent / tangent_norm
-        Tf = np.dot(lambdasf, tangent)
+        tangent      = tangent / tangent_norm
+        Tf           = np.dot(lambdasf, tangent)
 
         # return equality constraints
         return np.array([0, *dp, *dv, lmf, Tf])
