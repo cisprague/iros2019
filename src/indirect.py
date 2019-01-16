@@ -182,7 +182,7 @@ class Indirect(object):
                     break
 
                 # attempting homotopy boundary
-                elif (step < 0 and alpha < 0.001) or (step > 0 and alpha > 0.999):
+                elif (step < 0 and alpha < 0.001) or (step > 0 and alpha > 0.99):
                     alpha = 0 if step < 0 else 1
                     i += 1
 
