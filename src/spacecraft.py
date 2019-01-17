@@ -229,14 +229,18 @@ class Spacecraft(Indirect):
         x11 = np.inf*x6
         x12 = self.beta*x4
         x13 = x12 + x5
-        x14 = 1/(self.beta - 1)
-        x15 = x14*x6/2.
+        if self.beta != 1:
+            x14 = 1/(self.beta - 1)
+            x15 = x14*x6/2.
         
         # control throttles
         if alpha == 0 and self.beta == 0:
             u = x9
         elif alpha == 0 and self.beta == 1:
-            u = x10*x11
+            try:
+                u = x10*x11
+            except:
+                print(u)
         elif alpha == 1 and self.beta == 0:
             u = x9
         elif alpha == 1 and self.beta == 1:
@@ -320,13 +324,13 @@ class Spacecraft(Indirect):
         l0 = z[2:]
 
         # set final eccentric anomoly
-        self.kef[5] = Mf
+        kef = np.hstack((self.kef[:5], [Mf]))
 
         # final position and velocity
-        rf, vf = np.array(pk.par2ic(self.kef, pk.MU_SUN))
+        rf, vf = np.array(pk.par2ic(kef, pk.MU_SUN))
 
         # propagate trajectory
-        tl, sl = self.propagate(T, self.s0, l0, self.alpha, atol=1e-10, rtol=1e-10)
+        tl, sl = self.propagate(T, self.s0, l0, self.alpha, atol=1e-12, rtol=1e-12)
 
         # compute position and velocity
         dp = (sl[-1, 0:3] - rf)/self.L
@@ -355,3 +359,33 @@ class Spacecraft(Indirect):
         ub = [self.Tub, 4 * np.pi] + [self.lb] * self.sdim
         return lb, ub
 
+    def plot_traj(self, s, ax=None, alpha=0.1, mark='k-'):
+
+        # no axis provided
+        if ax is None:
+
+            # create one
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+
+            # planets
+            pk.orbit_plots.plot_planet(pk.planet.jpl_lp('earth'), pk.epoch(0), color=(0.8, 0.8, 0.8), ax=ax)
+            pk.orbit_plots.plot_planet(pk.planet.jpl_lp('mars'), pk.epoch(0), color=(0.8, 0.8, 0.8), ax=ax, s=0)
+
+            # remove background
+            ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+            ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+            ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+            ax.w_xaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+            ax.w_yaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+            ax.w_zaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+        
+        # axis provided
+        else:
+            ax = ax
+
+        # trajectory
+        ax.plot(s[:,0], s[:,1], s[:,2], mark, alpha=alpha)
+
+        return ax
+        

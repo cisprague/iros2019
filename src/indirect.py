@@ -84,7 +84,47 @@ class Indirect(object):
         )
         return tl, sl, ul
 
-    
+    def solve_par(self, s0, alpha, Tlb, Tub, lb, npar=cpu_count(), neval=200):
+
+        # intial state
+        self.s0    = np.array(s0, float)
+
+        # homotopy parameter
+        self.alpha = float(alpha)
+
+        # duration bounds
+        self.Tlb   = float(Tlb)
+        self.Tub   = float(Tub)
+
+        # costate magnitude bound
+        self.lb    = float(lb)
+
+        # problem
+        prob = pg.problem(self)
+        prob.c_tol = 1e-5
+
+        # algorithm
+        algo = pg.nlopt(solver="slsqp")
+        algo.maxeval = neval
+        algo.xtol_rel = 1e-7
+        algo.xtol_abs = 1e-7
+        algo = pg.algorithm(algo)
+        algo.set_verbosity(5)
+
+        # archipelago
+        archi = pg.archipelago(npar, algo=algo, prob=prob, pop_size=1)
+
+        # optimise 
+        archi.evolve()
+        archi.wait()
+
+        # solutions
+        z = archi.get_champions_x()
+        f = archi.get_champions_f()
+        feas = [prob.feasibility_x(x) for x in z]
+        
+        return z, f, feas
+
     def solve(self, s0, alpha, Tlb, Tub, lb, z=None, neval=200):
 
         # intial state
@@ -102,13 +142,13 @@ class Indirect(object):
         
         # problem
         prob = pg.problem(self)
-        prob.c_tol = 1e-8
+        prob.c_tol = 1e-5
 
         # algorithm
         algo = pg.nlopt(solver="slsqp")
         algo.maxeval = neval
-        algo.xtol_rel = 1e-10
-        algo.xtol_abs = 1e-10
+        algo.xtol_rel = 1e-7
+        algo.xtol_abs = 1e-7
         algo = pg.algorithm(algo)
         algo.set_verbosity(5)
         
@@ -138,6 +178,9 @@ class Indirect(object):
 
     def gradient(self, z):
         return pg.estimate_gradient(self.fitness, z)
+
+    def homotopy_beta(self, s0, alpha, Tlb, Tub, lb, z, alphag, step=0.01, verbose=False):
+        pass
 
     def homotopy(self, s0, alpha, Tlb, Tub, lb, z, alphag, step=0.01, verbose=False):
 
