@@ -2,7 +2,7 @@
 # Christopher Iliffe Sprague
 # christopher.iliffe.sprague@gmail.com
 
-import numpy as np, pykep as pk
+import numpy as np, pykep as pk, matplotlib.pyplot as plt
 from indirect import Indirect
 
 class Spacecraft(Indirect):
@@ -362,7 +362,10 @@ class Spacecraft(Indirect):
     def plot_traj(self, s, ax=None, alpha=0.1, mark='k-'):
 
         # no axis provided
+        ret = False
         if ax is None:
+
+            ret = True
 
             # create one
             fig = plt.figure()
@@ -373,19 +376,20 @@ class Spacecraft(Indirect):
             pk.orbit_plots.plot_planet(pk.planet.jpl_lp('mars'), pk.epoch(0), color=(0.8, 0.8, 0.8), ax=ax, s=0)
 
             # remove background
+            ax.set_aspect('equal')
+            ax.grid('False')
             ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
             ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
             ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
             ax.w_xaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
             ax.w_yaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
             ax.w_zaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
-        
-        # axis provided
-        else:
-            ax = ax
 
         # trajectory
         ax.plot(s[:,0], s[:,1], s[:,2], mark, alpha=alpha)
 
-        return ax
-        
+        if ret:
+            return fig, ax
+        else:
+            return ax
+

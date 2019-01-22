@@ -142,13 +142,13 @@ class Indirect(object):
         
         # problem
         prob = pg.problem(self)
-        prob.c_tol = 1e-5
+        prob.c_tol = 1e-8
 
         # algorithm
         algo = pg.nlopt(solver="slsqp")
         algo.maxeval = neval
-        algo.xtol_rel = 1e-7
-        algo.xtol_abs = 1e-7
+        algo.xtol_rel = 1e-10
+        algo.xtol_abs = 1e-10
         algo = pg.algorithm(algo)
         algo.set_verbosity(5)
         
@@ -178,9 +178,6 @@ class Indirect(object):
 
     def gradient(self, z):
         return pg.estimate_gradient(self.fitness, z)
-
-    def homotopy_beta(self, s0, alpha, Tlb, Tub, lb, z, alphag, step=0.01, verbose=False):
-        pass
 
     def homotopy(self, s0, alpha, Tlb, Tub, lb, z, alphag, step=0.01, verbose=False):
 
@@ -244,6 +241,71 @@ class Indirect(object):
 
         # return solutions
         return np.array(sols)
+
+    def homotopy_beta(self, s0, alpha, beta, Tlb, Tub, lb, z, betag, step=0.01, verbose=False):
+
+            # step direction
+            step = step if betag - beta > 0 else -step
+
+            # solve problem with initial decision vector
+            self.beta = beta
+            betas = beta
+            zo, f, feas = self.solve(s0, alpha, Tlb, Tub, lb, z)
+
+            # continue only if intial configuration is succesfull
+            if feas:
+                pass
+            else:
+                return None
+
+            # solution record
+            sols = list()
+
+            # homotopy loop
+            i = 0
+            while i < 2:
+
+                # solve trajectory
+                z, f, feas = self.solve(s0, alpha, Tlb, Tub, lb, z=zo)
+
+                # feasible
+                if feas:
+
+                    # progress message
+                    print("z={}\nbeta={}".format(z, self.beta))
+
+                    # store solution
+                    zo = z
+                    betas = self.beta
+
+                    # record solution
+                    sols.append((zo, betas))
+
+                    # finished homotopy
+                    if self.beta == betag:
+                        print("Finished")
+                        break
+
+                    # attempting homotopy boundary
+                    elif (step < 0 and self.beta < 0.001) or (step > 0 and self.beta > 0.99):
+                        self.beta = betag
+                        i += 1
+
+                    # change homotopy parameter
+                    else:
+
+                        # bounded step
+                        bstep = min(abs(self.beta - (betag + self.beta)/2), abs(step))
+
+                        # apply step 
+                        self.beta += bstep if step > 0 else -bstep
+
+                # infeasible
+                else:
+                    self.beta = (betas + self.beta)/2
+
+            # return solutions
+            return np.array(sols)
 
     def random_walks(self, tl, sll, alpha, Tlb, Tub, lb, dsm=0.02, ns=5, nn=20, nw=10):
 
@@ -382,6 +444,35 @@ class Indirect(object):
 
         # parallel homotopy - z alpha
         zall = Pool(cpu_count()).starmap(self.homotopy, args)
+
+        # assemble results
+        res = list()
+        for s0z, zal in zip(s0zl, zall):
+
+            # initial state
+            s0 = s0z[0]
+
+            # for each homotopy node
+            for za in zal:
+
+                # decision vector
+                z = za[0]
+
+                # homotopy parameter
+                a = za[1]
+
+                # add result
+                res.append((s0, z, a))
+
+        return np.array(res)
+
+    def homotopy_db_beta(self, s0zl, alpha, beta, Tlb, Tub, lb, betag, step=0.01):
+
+        # arguments for parallel
+        args = [(s0z[0], alpha, beta, Tlb, Tub, lb, s0z[1], betag, step) for s0z in s0zl]
+
+        # parallel homotopy - z alpha
+        zall = Pool(cpu_count()).starmap(self.homotopy_beta, args)
 
         # assemble results
         res = list()
