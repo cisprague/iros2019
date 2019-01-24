@@ -32,7 +32,8 @@ class MLP(torch.nn.Sequential):
             self.ops.append(torch.nn.Linear(self.shape[i], self.shape[i + 1]))
 
             # batch normalisation
-            #self.ops.append(torch.nn.BatchNorm1d(self.shape[i + 1]))
+            if i == 0:
+                self.ops.append(torch.nn.BatchNorm1d(self.shape[i + 1]))
 
             # if penultimate layer
             if i == self.nl - 2:
@@ -134,5 +135,37 @@ class Pendulum_Controller(MLP):
         sa = torch.from_numpy(sa).double()
         sa = self(sa).detach().numpy().flatten()[0]
         return sa
+
+class Spacecraft_Controller(MLP):
+
+    def __init__(self, shape):
+
+        # initialise MLP
+        MLP.__init__(self, shape)
+
+    def __call__(self, x):
+
+        # original output
+        x = MLP.__call__(self, x)
+
+        u, ux, uy, uz = (x[:,0] + 1)/2, x[:,1], x[:,2], x[:,3]
+
+        # signals
+        '''
+        s1, s2, s3 = x[:,0], x[:,1], x[:,2]
+
+        # spherical params
+        u, ctheta, phi = (s1 + 1)/2, s2, ((s3 + 1)/2)*2*np.pi
+
+        # cartesian 
+        theta = torch.acos(ctheta)
+        ux = torch.sin(theta)*torch.cos(phi)
+        uy = torch.sin(theta)*torch.sin(phi)
+        uz = torch.cos(theta)
+        '''
+
+        return torch.stack((u, ux, uy, uz), dim=1)
+
+
 
 

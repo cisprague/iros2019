@@ -393,3 +393,23 @@ class Spacecraft(Indirect):
         else:
             return ax
 
+
+    def gen_db(self, res, cat=False):
+
+        # data list
+        dl = list()
+
+        # propagate all the trajectories
+        for r in res:
+            s0, z, alpha = r
+            tll, sll, ul = self.propagate(z[0], s0, z[2:], alpha, u=True)
+            d = np.hstack((
+                sll[:, :self.sdim],
+                np.full((len(sll), 1), alpha), 
+                ul.reshape(-1, self.udim)
+            ))
+            dl.append(d)
+        if cat:
+            return np.vstack(dl)
+        else:
+            return np.array(dl)
