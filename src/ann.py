@@ -31,16 +31,15 @@ class MLP(torch.nn.Sequential):
             # linear layer
             self.ops.append(torch.nn.Linear(self.shape[i], self.shape[i + 1]))
 
-            # batch normalisation
-            if i == 0:
-                self.ops.append(torch.nn.BatchNorm1d(self.shape[i + 1]))
-
             # if penultimate layer
             if i == self.nl - 2:
 
                 # output between 0 and 1
                 self.ops.append(torch.nn.Tanh())
                 pass
+
+            elif i == 0 or i == 1:
+                self.ops.append(torch.nn.BatchNorm1d(self.shape[i + 1]))
 
             # if hidden layer
             else:
@@ -165,6 +164,23 @@ class Spacecraft_Controller(MLP):
         '''
 
         return torch.stack((u, ux, uy, uz), dim=1)
+
+
+class Spacecraft_Throttle_Controller(MLP):
+
+    def __init__(self, shape):
+
+        # initialise MLP
+        MLP.__init__(self, shape)
+
+    def __call__(self, x):
+
+        # original output
+        x = MLP.__call__(self, x)
+
+        u = (x + 1)/2
+
+        return u
 
 
 
