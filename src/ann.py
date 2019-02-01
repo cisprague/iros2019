@@ -28,6 +28,9 @@ class MLP(torch.nn.Sequential):
         # apply operations
         for i in range(self.nl - 1):
 
+            if i == 0:
+                self.ops.append(torch.nn.LayerNorm(self.shape[i]))
+
             # linear layer
             self.ops.append(torch.nn.Linear(self.shape[i], self.shape[i + 1]))
 
@@ -38,14 +41,11 @@ class MLP(torch.nn.Sequential):
                 self.ops.append(torch.nn.Tanh())
                 pass
 
-            elif i == 0 or i == 1:
-                self.ops.append(torch.nn.BatchNorm1d(self.shape[i + 1]))
-
             # if hidden layer
             else:
 
                 # activation
-                self.ops.append(torch.nn.LeakyReLU())
+                self.ops.append(torch.nn.Softplus())
                 pass
 
         # initialise neural network
@@ -178,7 +178,7 @@ class Spacecraft_Throttle_Controller(MLP):
         # original output
         x = MLP.__call__(self, x)
 
-        u = (x + 1)/2
+        u = (x + 1.)/2.
 
         return u
 
