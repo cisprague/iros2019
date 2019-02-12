@@ -9,11 +9,11 @@ if __name__ == "__main__":
     
 
     # load training database
-    db = np.load('../notebooks/pqhanndb.npy')
+    db = np.load('../notebooks/spacecraft_db.npy')
     print(db[0])
 
     # format database
-    db = Data(db, [0, 1, 2, 3, 4], [5])
+    db = Data(db, [0, 1, 2, 3, 4, 5, 6, 7], [8, 9, 10, 11])
     
 
     # net trainer
@@ -23,8 +23,8 @@ if __name__ == "__main__":
 
     # try to find previous neural networks
     try:
-        nets = cp.load(open("pendulum_nets.p", "rb"))
-        #db   = cp.load(open("pendulum_db.p", "rb"))
+        nets = cp.load(open("spacecraft_nets.p", "rb"))
+        #db   = cp.load(open("spacecraft_db.p", "rb"))
         print("Found nets")
 
     # otherwise create them
@@ -37,12 +37,12 @@ if __name__ == "__main__":
             (100, 4)
         ]
 
-        nets = [Pendulum_Controller([8] + [shape[0]]*shape[1] + [3]) for shape in shapes]
+        nets = [Spacecraft_Controller([8] + [shape[0]]*shape[1] + [3]) for shape in shapes]
         print("Created nets")
 
     # train
     nets = Pool(cpu_count()).map(train_nets, nets)
 
     # save nets
-    cp.dump(nets, open("pendulum_nets.p", "wb"))
-    cp.dump(db, open("pendulum_db.p", "wb"))
+    cp.dump(nets, open("spacecraft_nets.p", "wb"))
+    cp.dump(db, open("spacecraft_db.p", "wb"))

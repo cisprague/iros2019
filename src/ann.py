@@ -27,9 +27,8 @@ class MLP(torch.nn.Sequential):
 
         # apply operations
         for i in range(self.nl - 1):
-
-            if i == 0:
-                self.ops.append(torch.nn.LayerNorm(self.shape[i]))
+            
+            self.ops.append(torch.nn.LayerNorm(self.shape[i]))
 
             # linear layer
             self.ops.append(torch.nn.Linear(self.shape[i], self.shape[i + 1]))
@@ -97,7 +96,7 @@ class MLP(torch.nn.Sequential):
             self.ltrn.append(ltrn.item())
 
             # print progress
-            print("Episode {}; Testing Loss {}; Training Loss {}".format(e, self.ltst[-1], self.ltrn[-1]))
+            print("ANN {}; Episode {}; Testing Loss {}; Training Loss {}".format(self.shape, e, self.ltst[-1], self.ltrn[-1]))
 
             # backpropagate training error
             ltrn.backward()
@@ -147,26 +146,30 @@ class Spacecraft_Controller(MLP):
         # original output
         x = MLP.__call__(self, x)
 
-        u, ux, uy, uz = (x[:,0] + 1)/2, x[:,1], x[:,2], x[:,3]
+        # throttle
+        u = (x[:,0] + 1)/2
 
-        # signals
-        '''
-        s1, s2, s3 = x[:,0], x[:,1], x[:,2]
+        # thrust inclination [0, pi]
+        theta = (x[:,1] + 1)/2*np.pi
 
-        # spherical params
-        u, ctheta, phi = (s1 + 1)/2, s2, ((s3 + 1)/2)*2*np.pi
+        # thrust azimuth
+        phi = (x[:,2] + 1)/2*np.pi*2
 
-        # cartesian 
-        theta = torch.acos(ctheta)
+        # convert to rene descartes
         ux = torch.sin(theta)*torch.cos(phi)
         uy = torch.sin(theta)*torch.sin(phi)
         uz = torch.cos(theta)
-        '''
 
         return torch.stack((u, ux, uy, uz), dim=1)
 
+    def predict(self, s, alpha):
+        sa = np.hstack((s, [alpha]))
+        sa = np.array([sa])
+        sa = torch.from_numpy(sa).double()
+        sa = self(sa).detach().numpy().flatten()
+        return sa
 
-class Spacecraft_Throttle_Controller(MLP):
+class Spacecraft_Direction_Controller(MLP):
 
     def __init__(self, shape):
 
@@ -178,9 +181,62 @@ class Spacecraft_Throttle_Controller(MLP):
         # original output
         x = MLP.__call__(self, x)
 
-        u = (x + 1.)/2.
+        # thrust inclination [0, pi]
+        theta = (x[:,0] + 1)/2*np.pi
+
+        # thrust azimuth
+        phi = (x[:,1] + 1)/2*np.pi*2
+
+        # convert to rene descartes
+        ux = torch.sin(theta)*torch.cos(phi)
+        uy = torch.sin(theta)*torch.sin(phi)
+        uz = torch.cos(theta)
+
+        return torch.stack((ux, uy, uz), dim=1)
+
+class Spacecraft_Thrust_Controller(MLP):
+
+    def __init__(self, shape):
+
+        # initialise MLP
+        MLP.__init__(self, shape)
+
+    def __call__(self, x):
+
+        # original output
+        x = MLP.__call__(self, x)
+
+        # thrust throttle
+        u = (x[:,0] + 1)/2
 
         return u
+
+class Spacecraft_Controller_Joined(object):
+
+    def __init__(self, throttle, direction):
+
+        # sub neural networks
+        self.throttle = throttle
+        self.direction = direction
+
+    def predict(self, s, alpha):
+
+        # compute throttle
+        sa = np.hstack((s, [alpha]))
+        sa = np.array([sa])
+        sa = torch.from_numpy(sa).double()
+        u = self.throttle(sa).detach().numpy().flatten()[0]
+
+        # compute direction
+        s = np.array([s])
+        s = torch.from_numpy(s).double()
+        ux, uy, uz = self.direction(s).detach().numpy().flatten()
+
+        # return complete control
+        return np.array([u, ux, uy, uz])
+
+
+
 
 
 

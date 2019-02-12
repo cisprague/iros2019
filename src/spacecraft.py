@@ -40,6 +40,9 @@ class Spacecraft(Indirect):
         # secondary homotopy parameter
         self.beta = 0
 
+        # desired final state
+        self.sf = None
+
     def ds(self, s, u):
 
         # state 
@@ -312,11 +315,50 @@ class Spacecraft(Indirect):
         else:
             return tl, sl
 
+    def propagate_controller(self, T, s0, u, alpha, atol=1e-12, rtol=1e-12):
+
+        # nondimensionalise initial state
+        s0 = np.copy(s0)
+        s0[0:3] /= self.L 
+        s0[3:6] /= self.V
+        s0[6]   /= self.M
+
+        # duration from mjd2000 to mjs2000
+        T = pk.epoch(T).mjd2000*24*60*60
+
+        # nondimensionalise time
+        T /= self.T
+
+        # nondimensionalise constants
+        self.c1 /= self.F
+        self.c2 /= self.Q
+        self.mu /= pk.MU_SUN
+
+        # propagate
+        tl, sl, ul = Indirect.propagate_controller(self, T, s0, u, alpha, atol=atol, rtol=rtol)
+
+        # redimensionalise states
+        sl[:, 0:3] *= self.L
+        sl[:, 3:6] *= self.V
+        sl[:, 6]   *= self.M
+
+        # redimensionalise times
+        tl *= self.T
+        tl /= 24*60*60
+
+        # redimensionalise constants
+        self.c1 *= self.F
+        self.c2 *= self.Q
+        self.mu *= pk.MU_SUN
+
+        # return times, states, and possibly controls
+        return tl, sl, ul
+
     def fitness(self, z):
 
         # duration
         T = z[0]
-
+        
         # final eccentric annomolies
         Mf = z[1]
 
@@ -333,26 +375,40 @@ class Spacecraft(Indirect):
         tl, sl = self.propagate(T, self.s0, l0, self.alpha, atol=1e-12, rtol=1e-12)
 
         # compute position and velocity
-        dp = (sl[-1, 0:3] - rf)/self.L
-        dv = (sl[-1, 3:6] - vf)/self.V
+        if self.sf is None:
+            dp = (sl[-1, 0:3] - rf)/self.L
+            dv = (sl[-1, 3:6] - vf)/self.V
+        else:
+            dp = (sl[-1, 0:3] - self.sf[0:3])/self.L
+            dv = (sl[-1, 3:6] - self.sf[3:6])/self.V
 
         # mass transversality
         lmf = sl[-1, 13]
 
         # final eccentric anomoly transversality
-        lambdasf     = sl[-1, 7:13]
-        rfnorm       = np.linalg.norm(rf)
-        tmp          = -self.mu/rfnorm**3
-        tangent      = np.hstack((vf, tmp*rf))
-        tangent_norm = np.linalg.norm(tangent)
-        tangent      = tangent / tangent_norm
-        Tf           = np.dot(lambdasf, tangent)
+        if self.sf is None:
+            lambdasf     = sl[-1, 7:13]
+            rfnorm       = np.linalg.norm(rf)
+            tmp          = -self.mu/rfnorm**3
+            tangent      = np.hstack((vf, tmp*rf))
+            tangent_norm = np.linalg.norm(tangent)
+            tangent      = tangent / tangent_norm
+            Tf           = np.dot(lambdasf, tangent)
 
         # return equality constraints
-        return np.array([0, *dp, *dv, lmf, Tf])
+        if self.sf is None:
+            return np.array([0, *dp, *dv, lmf, Tf])
+        else:
+            return np.array([0, *dp, *dv, lmf])
+
+    def lagrangian(self, u, alpha, beta):
+        return beta*(alpha + u*(-alpha + 1)) + u**2*(-beta + 1)
 
     def get_nec(self):
-        return self.sdim + 1
+        if self.sf is None:
+            return self.sdim + 1
+        else:
+            return self.sdim
 
     def get_bounds(self):
         lb = [self.Tlb, -4 * np.pi] + [-self.lb] * self.sdim
@@ -403,6 +459,9 @@ class Spacecraft(Indirect):
         for r in res:
             s0, z, alpha = r
             tll, sll, ul = self.propagate(z[0], s0, z[2:], alpha, u=True)
+            sll[:, 0:3] /= self.L 
+            sll[:, 3:6] /= self.V 
+            sll[:, 6]   /= self.M
             d = np.hstack((
                 sll[:, :self.sdim],
                 np.full((len(sll), 1), alpha), 

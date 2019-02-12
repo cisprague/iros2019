@@ -11,10 +11,14 @@ from indirect import Indirect
 
 class Pendulum(Indirect):
 
-    def __init__(self):
+    def __init__(self, ub=2):
 
         # initialise indirect trajectory
         Indirect.__init__(self, 4, 1, [3, 2, 2*np.pi, 2])
+
+        self.sf = np.zeros(self.sdim)
+        self.beta = 0
+        self.ub = ub
 
     def ds(self, s, u):
 
@@ -94,9 +98,28 @@ class Pendulum(Indirect):
             u = (-lomega*np.cos(theta) + lv)/(2*(alpha - 1))
 
         if bound:
-            return np.clip(u, -1, 1)
+            return np.clip(u, -self.ub, self.ub)
         else:
             return u
+
+    def ubeta(self, sl, alpha):
+
+        # fullstate
+        x, v, theta, omega, lx, lv, ltheta, lw = sl
+        
+        # compute control
+        if self.beta == 0:
+            u = lw*np.cos(theta)/2 - lv/2
+        elif alpha == 0 and self.beta == 0:
+            u = np.inf*(-lw*np.cos(theta) + lv + 1)
+        elif alpha == 1 and self.beta == 1:
+            u = np.inf*(-lw*np.cos(theta) + lv)
+        elif self.beta == 1:
+            u = np.inf*(-alpha - lw*np.cos(theta) + lv + 1)
+        else:
+            u = (-alpha*self.beta + self.beta - lw*np.cos(theta) + lv)/(2*(self.beta - 1))
+
+        return np.clip(u, -2, 2)
 
     def fitness(self, z):
 
@@ -107,11 +130,16 @@ class Pendulum(Indirect):
         tl, sl = self.propagate(T, self.s0, l0, self.alpha, atol=1e-12, rtol=1e-12)
 
         # state mismatch
-        ec = np.zeros(self.sdim) - sl[-1, :self.sdim]
+        #ec = np.zeros(self.sdim) - sl[-1, :self.sdim]
+        ec = self.sf - sl[-1, :self.sdim]
+        #ec[0] = sl[-1, 4]
         #ec[2] = np.cos(sl[-1, 2]) - 1
 
         # fitness vector
         return np.hstack(([0], ec))
+
+    def lagrangian(self, u, alpha, beta):
+        return alpha*(beta + (-beta + 1)*abs(u)) + u**2*(-alpha + 1)
 
     def plot_states(self, tl, sl, ul):
 
@@ -119,7 +147,7 @@ class Pendulum(Indirect):
         fig, ax = Indirect.plot_states(self, tl, sl, ul)
 
         # labels
-        labels = [r'$x$', r'$v$', r'$\theta$', r'$\omega$', r'$u$']
+        labels = [r'$x$', r'$v$', r'$theta$', r'$\omega$', r'$u$']
         
         # apply y labels
         for a, l in zip(ax, labels):

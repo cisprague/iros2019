@@ -195,7 +195,7 @@ class Indirect(object):
 
         # solution record
         sols = list()
-
+        
         # homotopy loop
         i = 0
         while i < 2:
@@ -222,7 +222,7 @@ class Indirect(object):
                     break
 
                 # attempting homotopy boundary
-                elif (step < 0 and alpha < 0.001) or (step > 0 and alpha > 0.99):
+                elif (step < 0 and alpha < 0.01) or (step > 0 and alpha > 0.99):
                     alpha = 0 if step < 0 else 1
                     i += 1
 
@@ -503,7 +503,7 @@ class Indirect(object):
         # propagate all the trajectories
         for r in res:
             s0, z, alpha = r
-            tll, sll, ul = self.propagate(z[0], s0, z[1:], alpha, u=True)
+            tll, sll, ul = self.propagate(z[0], s0, z[1:], alpha, u=True, atol=1e-13, rtol=1e-13)
             d = np.hstack((
                 sll[:, :self.sdim],
                 np.full((len(sll), 1), alpha), 
