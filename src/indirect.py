@@ -138,7 +138,7 @@ class Indirect(object):
         self.Tub   = float(Tub)
 
         # costate magnitude bound
-        self.lb    = float(lb)
+        self.lb    = lb
         
         # problem
         prob = pg.problem(self)
@@ -166,8 +166,13 @@ class Indirect(object):
         return pop.champion_x, pop.champion_f, prob.feasibility_x(pop.champion_x)
 
     def get_bounds(self):
-        lb = [self.Tlb] + [-self.lb]*self.sdim
-        ub = [self.Tub] + [self.lb]*self.sdim 
+        if isinstance(self.lb, float) or isinstance(self.lb, int):
+            lb = [self.Tlb] + [-self.lb]*self.sdim
+            ub = [self.Tub] + [self.lb]*self.sdim
+        else:
+            lb = [self.Tlb] + [-v for v in self.lb]
+            ub = [self.Tub] + [v for v in self.lb]
+            
         return lb, ub
 
     def get_nobj(self):
@@ -198,7 +203,7 @@ class Indirect(object):
         
         # homotopy loop
         i = 0
-        while i < 2:
+        while i <= 2:
 
             # solve trajectory
             z, f, feas = self.solve(s0, alpha, Tlb, Tub, lb, z=zo)
@@ -212,6 +217,7 @@ class Indirect(object):
                 # store solution
                 zo = z
                 alphao = alpha
+                Tub = zo[0]
 
                 # record solution
                 sols.append((zo, alphao))

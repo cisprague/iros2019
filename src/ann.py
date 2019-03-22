@@ -7,6 +7,8 @@ class MLP(torch.nn.Sequential):
 
     def __init__(self, shape):
 
+        torch.manual_seed(0)
+
         # architecture
         self.shape = shape
 
@@ -74,7 +76,7 @@ class MLP(torch.nn.Sequential):
         otrn = odat[n:, :]
 
         # optimiser
-        opt = torch.optim.Adam(self.parameters(), lr=lr)
+        opt = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-4)
 
         # loss function
         lf = torch.nn.MSELoss()
@@ -104,6 +106,84 @@ class MLP(torch.nn.Sequential):
             # update weights
             opt.step()
 
+
+
+    def trainy(self, idat, odat, epo=500, batches=1, lr=1e-4, ptst=0.1, gpu=False):
+
+        # put the net on the gpu if needed
+        if gpu:
+            self.cuda(async=True)
+        else:
+            self.cpu()
+
+        # number of testing samples
+        ntst = int(ptst*idat.shape[0])
+
+        # optimiser
+        opt = torch.optim.Adam(self.parameters(), lr=lr)
+
+        # loss function
+        lf = torch.nn.MSELoss()
+
+        # seperate training data into batches
+        input_train = idat[ntst:].chunk(batches)
+        output_train = odat[ntst:].chunk(batches)
+
+        # seperate testing data into batches
+        input_test = idat[:ntst].chunk(batches)
+        output_test = odat[:ntst].chunk(batches)
+
+        # for each episode
+        for e in range(epo):
+
+            # zero the gradient
+            opt.zero_grad()
+
+            # episode loss
+            msetrn = 0
+            msetst = 0
+
+            # for each batch
+            for itrn, otrn, itst, otst in zip(input_train, output_train, input_test, output_test):
+
+                # put on gpu if needed
+                if gpu:
+                    itrn = itrn.cuda()
+                    itst = itst.cuda()
+                    otrn = otrn.cuda()
+                    otst = otst.cuda()
+
+                # training loss
+                ltrn = lf(self(itrn), otrn)
+
+                # testing loss
+                ltst = lf(self(itst), otst)
+
+                # accumulate gradient
+                ltrn.backward()
+
+                # track losses
+                msetrn += ltrn.item()
+                msetst += ltst.item()
+
+            # update weights
+            opt.step()
+
+            # record losses
+            self.ltrn.append(msetrn/batches)
+            self.ltst.append(msetst/batches)
+
+            # message
+            print("ANN {}; Episode {}; Testing Loss {}; Training Loss {}".format(self.shape, e, self.ltst[-1], self.ltrn[-1]))
+
+
+
+
+
+
+
+
+
 class Data(object):
 
     def __init__(self, data, cin, cout):
@@ -118,8 +198,8 @@ class Data(object):
         self.n = data.shape[0]
 
         # cast to torch
-        self.i = torch.from_numpy(data[:, cin]).double()
-        self.o = torch.from_numpy(data[:, cout]).double()
+        self.i = torch.from_numpy(data[:, cin]).double().share_memory_()
+        self.o = torch.from_numpy(data[:, cout]).double().share_memory_()
 
 class Pendulum_Controller(MLP):
 

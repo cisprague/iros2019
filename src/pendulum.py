@@ -19,6 +19,7 @@ class Pendulum(Indirect):
         self.sf = np.zeros(self.sdim)
         self.beta = 0
         self.ub = ub
+        self.bound = True
 
     def ds(self, s, u):
 
@@ -87,20 +88,20 @@ class Pendulum(Indirect):
             [0, 0,                             0, 0,  0, 0, -1,        0]
         ], float)
 
-    def u(self, sl, alpha, bound=True):
+    def u(self, sl, alpha):
 
         # fullstate
         x, v, theta, omega, lx, lv, ltheta, lomega = sl
 
         if alpha == 1:
-            u = np.inf*(-lomega*np.cos(theta) + lv)
+            s = -lomega*np.cos(theta) + lv
+            u = -self.ub if s <= 0 else self.ub
         else:
             u = (-lomega*np.cos(theta) + lv)/(2*(alpha - 1))
 
-        if bound:
-            return np.clip(u, -self.ub, self.ub)
-        else:
-            return u
+        if self.bound:
+            u = np.clip(u, -self.ub, self.ub)
+        return u
 
     def ubeta(self, sl, alpha):
 
@@ -127,7 +128,7 @@ class Pendulum(Indirect):
         T, l0 = z[0], z[1:]
 
         # simulate
-        tl, sl = self.propagate(T, self.s0, l0, self.alpha, atol=1e-12, rtol=1e-12)
+        tl, sl = self.propagate(T, self.s0, l0, self.alpha, atol=1e-13, rtol=1e-13)
 
         # state mismatch
         #ec = np.zeros(self.sdim) - sl[-1, :self.sdim]
